@@ -39,7 +39,7 @@ bupt-skill/
 | `login.mjs` | CAS 统一身份认证密码登录 |
 | `list-courses.mjs` | 查看本学期所有课程 |
 | `list-pending-tasks.mjs` | 快速查看首页"待办"中的作业详情（名称、内容、截止时间、章节、分数等） |
-| `list-assignment-courses.mjs` | 遍历所有课程，找到每个作业所属的课程 |
+| `list-assignment-courses.mjs` | 遍历所有课程，找到每个作业所属的课程 （什么逻辑能写出作业详情界面查找不到对应课程？？？？） |
 | `list-course-files.mjs` | 列出指定课程的全部课件（按章节/子块层级展示） |
 | `download-course-file.mjs` | 下载指定课件到本地 |
 | `submit-assignment.mjs` | 上传附件并提交作业（提交前有终端确认步骤） |
