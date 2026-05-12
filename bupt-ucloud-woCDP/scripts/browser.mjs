@@ -18,10 +18,14 @@ const AB_BIN = join(__dirname, "..", "node_modules", ".bin", "agent-browser");
  */
 export function ab(args, options = {}) {
   const cmd = `${AB_BIN} ${args}`;
+  // 清理可能导致 Node 启动失败的环境变量
+  const cleanEnv = { ...process.env };
+  delete cleanEnv.NODE_OPTIONS;
   try {
     return execSync(cmd, {
       encoding: "utf-8",
       timeout: options.timeout || 30000,
+      env: cleanEnv,
       ...options,
     }).trim();
   } catch (err) {
@@ -154,10 +158,14 @@ export function mainFrame() {
 }
 
 /**
- * 关闭浏览器
+ * 关闭浏览器（容错：超时或失败时静默忽略）
  */
 export function close() {
-  return ab("close");
+  try {
+    return ab("close", { timeout: 5000 });
+  } catch {
+    return "";
+  }
 }
 
 /**
