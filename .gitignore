@@ -1,3 +1,6 @@
 node_modules/
+bupt-ucloud-woCDP/node_modules/
+bupt-ucloud-woCDP/evals/
+AGENTS.md
 .DS_Store
 *.log
