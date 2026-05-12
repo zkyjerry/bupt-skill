@@ -1,0 +1,29 @@
+{
+  "skill_name": "bupt-campus-woCDP",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我登录北邮云邮教学平台，学工号是2023211442，密码是zky~jerry666666",
+      "expected_output": "登录成功，输出包含 ucloud.bupt.edu.cn 的 URL",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "登录后，列出本学期所有课程名称",
+      "expected_output": "显示12门课程，包括射箭、通信软件设计、软件测试技术等",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "登录后，查看通信软件设计课程的所有课件文件列表",
+      "expected_output": "显示课程文件列表，包含Prelude、Unit01-概论等章节的文件",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "登录后，下载通信软件设计课程中CSD-Unit01-Course.Info.pptx文件到~/Downloads",
+      "expected_output": "文件下载成功，输出保存路径",
+      "files": []
+    }
+  ]
+}

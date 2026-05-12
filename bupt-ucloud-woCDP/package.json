@@ -1,0 +1,32 @@
+{
+  "name": "bupt-ucloud-woCDP",
+  "version": "1.0.0",
+  "description": "北邮云邮教学平台自动化 - AgentBrowser 方案（无需 CDP）",
+  "type": "module",
+  "bin": {
+    "bupt-login": "./scripts/login.mjs",
+    "bupt-courses": "./scripts/list-courses.mjs",
+    "bupt-tasks": "./scripts/list-pending-tasks.mjs",
+    "bupt-files": "./scripts/list-course-files.mjs",
+    "bupt-download": "./scripts/download-course-file.mjs",
+    "bupt-submit": "./scripts/submit-assignment.mjs",
+    "bupt-assignment-courses": "./scripts/list-assignment-courses.mjs"
+  },
+  "scripts": {
+    "postinstall": "agent-browser install",
+    "login": "node scripts/login.mjs",
+    "courses": "node scripts/list-courses.mjs",
+    "tasks": "node scripts/list-pending-tasks.mjs",
+    "files": "node scripts/list-course-files.mjs",
+    "download": "node scripts/download-course-file.mjs",
+    "submit": "node scripts/submit-assignment.mjs",
+    "assignment-courses": "node scripts/list-assignment-courses.mjs"
+  },
+  "dependencies": {
+    "agent-browser": "^0.27.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
