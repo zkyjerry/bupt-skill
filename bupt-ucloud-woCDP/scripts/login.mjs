@@ -20,7 +20,8 @@
 
 import {
   open, getUrl, waitLoad, snapshot, fill, click,
-  switchFrame, mainFrame, evalJS, wait, close
+  switchFrame, mainFrame, evalJS, wait, close,
+  saveState
 } from "./browser.mjs";
 
 const LOGIN_BASE = "https://auth.bupt.edu.cn/authserver/login";
@@ -125,7 +126,8 @@ async function login() {
       return 1;
     }
 
-    // 登录成功
+    // 登录成功，保存会话状态
+    saveState();
     console.log(finalUrl);
     return 0;
 

@@ -247,3 +247,52 @@ export function getLocalStorage(key) {
 export function screenshot(path) {
   return ab(`screenshot ${path}`);
 }
+
+// ---------- 会话状态管理 ----------
+
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { homedir } from "os";
+
+const STATE_DIR = join(homedir(), ".bupt-ucloud");
+const STATE_FILE = join(STATE_DIR, "session.json");
+
+/**
+ * 保存浏览器会话状态（cookies、localStorage 等）
+ * 登录成功后调用，后续脚本可复用
+ */
+export function saveState() {
+  if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+  ab(`state save "${STATE_FILE}"`);
+}
+
+/**
+ * 加载之前保存的会话状态
+ * 在打开页面前调用，恢复登录态
+ * @returns {boolean} 是否成功加载
+ */
+export function loadState() {
+  if (!existsSync(STATE_FILE)) return false;
+  try {
+    ab(`state load "${STATE_FILE}"`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 检查是否有保存的会话状态
+ * @returns {boolean}
+ */
+export function hasState() {
+  return existsSync(STATE_FILE);
+}
+
+/**
+ * 清除保存的会话状态
+ */
+export function clearState() {
+  if (existsSync(STATE_FILE)) {
+    unlinkSync(STATE_FILE);
+  }
+}

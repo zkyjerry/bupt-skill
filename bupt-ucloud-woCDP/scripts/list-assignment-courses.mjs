@@ -17,7 +17,7 @@
  */
 
 import {
-  open, getUrl, waitLoad, evalJS, wait, close
+  open, getUrl, waitLoad, evalJS, wait, close, loadState
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
@@ -30,6 +30,9 @@ const titleKeyword = titleIdx >= 0 ? process.argv[titleIdx + 1] : null;
 
 async function run() {
   try {
+    // 0. 加载保存的会话状态
+    loadState();
+
     // 1. 打开主页
     open(HOME_URL);
     waitLoad();

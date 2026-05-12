@@ -15,7 +15,7 @@
  */
 
 import {
-  open, getUrl, waitLoad, evalJS, wait, close
+  open, getUrl, waitLoad, evalJS, wait, close, loadState
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
@@ -25,6 +25,9 @@ const isJson = process.argv.includes("--json");
 
 async function listCourses() {
   try {
+    // 0. 加载保存的会话状态
+    loadState();
+
     // 1. 打开主页
     open(HOME_URL);
     waitLoad();
@@ -67,9 +70,14 @@ async function listCourses() {
 
     let data;
     try {
-      data = JSON.parse(result);
-    } catch {
-      console.error("解析课程数据失败");
+      // 处理可能的双重引号包裹
+      let parseTarget = result;
+      if (parseTarget.startsWith('"') && parseTarget.endsWith('"')) {
+        try { parseTarget = JSON.parse(parseTarget); } catch {}
+      }
+      data = typeof parseTarget === 'string' ? JSON.parse(parseTarget) : parseTarget;
+    } catch (e) {
+      console.error("解析课程数据失败:", e.message);
       return 1;
     }
 
