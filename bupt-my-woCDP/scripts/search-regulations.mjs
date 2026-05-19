@@ -3,14 +3,13 @@
  * 北邮信息门户 - 检索规章制度
  *
  * 用法：
- *   node search-regulations.mjs --keyword <关键词> [--page N] [--list-only] [--json] [--download-dir DIR]
+ *   node search-regulations.mjs --keyword <关键词> [--list-only] [--json] [--download-dir DIR]
  *
  * 选项：
- *   --keyword      搜索关键词（必填，--list-only 除外）
- *   --page N       页码，默认 1
+ *   --keyword      搜索关键词
  *   --list-only    只列出匹配条目
  *   --json         JSON 格式输出
- *   --download-dir 下载图片到指定目录（图片类内容时使用）
+ *   --download-dir 下载图片到指定目录
  *
  * 退出码：
  *   0  找到匹配
@@ -27,6 +26,7 @@ import {
 
 const LIST_URL = "http://my.bupt.edu.cn/list.jsp?urltype=tree.TreeTempUrl&wbtreeid=1536";
 const AUTH_DOMAIN = "auth.bupt.edu.cn";
+const LABEL = "规章制度";
 
 const args = process.argv.slice(2);
 const isListOnly = args.includes("--list-only");
@@ -35,9 +35,6 @@ const isJson = args.includes("--json");
 const keywordIdx = args.indexOf("--keyword");
 const keyword = keywordIdx !== -1 ? args[keywordIdx + 1] : null;
 
-const pageIdx = args.indexOf("--page");
-const page = pageIdx !== -1 ? parseInt(args[pageIdx + 1]) : 1;
-
 const downloadIdx = args.indexOf("--download-dir");
 const downloadDir = downloadIdx !== -1 ? args[downloadIdx + 1] : null;
 
@@ -45,14 +42,11 @@ async function downloadImages(imageUrls, title, baseDir) {
   const safeName = title.replace(/[\/\\:*?"<>|]/g, "_").substring(0, 30);
   const dir = join(baseDir, safeName);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-
   for (let i = 0; i < imageUrls.length; i++) {
-    const url = imageUrls[i];
     try {
-      const res = await fetch(url);
+      const res = await fetch(imageUrls[i]);
       const buf = Buffer.from(await res.arrayBuffer());
-      const ext = ".jpg";
-      const path = join(dir, `page_${String(i + 1).padStart(3, "0")}${ext}`);
+      const path = join(dir, `page_${String(i + 1).padStart(3, "0")}.jpg`);
       writeFileSync(path, buf);
       process.stderr.write(`  已下载 ${i + 1}/${imageUrls.length}: ${path}\n`);
     } catch (e) {
@@ -62,122 +56,136 @@ async function downloadImages(imageUrls, title, baseDir) {
   return dir;
 }
 
+function parseEvalResult(raw) {
+  try {
+    let parsed = raw;
+    while (typeof parsed === 'string' && parsed.startsWith('"') && parsed.endsWith('"')) {
+      try { parsed = JSON.parse(parsed); } catch { break; }
+    }
+    return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+  } catch { return raw; }
+}
+
 async function run() {
   try {
     loadState();
 
-    let targetUrl = LIST_URL;
-    if (page > 1) {
-      targetUrl += `&page=${page}`;
-    }
-    open(targetUrl);
+    // 1. Open list page
+    open(LIST_URL);
     waitLoad();
-
-    const pageUrl = getUrl();
-    if (pageUrl.includes(AUTH_DOMAIN)) {
+    if (getUrl().includes(AUTH_DOMAIN)) {
       console.error("未登录，请先运行 login.mjs");
       return 1;
     }
-
     wait(2000);
 
-    const itemsRaw = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(a => ({text: a.innerText?.trim(), href: a.href})).filter(item => item.text && item.text.length > 0))`);
-    let items = [];
-    try {
-      let parsed = itemsRaw;
-      while (typeof parsed === 'string' && parsed.startsWith('"') && parsed.endsWith('"')) {
-        try { parsed = JSON.parse(parsed); } catch { break; }
+    // For --list-only without keyword: just scrape list page
+    if (isListOnly && !keyword) {
+      const itemsRaw = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(function(a){return {text:a.innerText.trim(),href:a.href};}).filter(function(item){return item.text.length > 0;}))`);
+      const items = parseEvalResult(itemsRaw);
+      if (isJson) {
+        console.log(JSON.stringify({ total: items.length || 0, items: items || [] }, null, 2));
+      } else {
+        console.log(`${LABEL}（共 ${(items||[]).length} 条）\n`);
+        (items||[]).forEach((item, i) => console.log(`  ${i + 1}. ${item.text}`));
       }
-      items = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-    } catch {}
+      return (items||[]).length > 0 ? 0 : 1;
+    }
 
+    if (!keyword) {
+      console.error("error: --keyword is required");
+      return 2;
+    }
+
+    // 2. Submit search via the built-in form
+    const searchResult = evalJS(`(function(){
+      const input = document.querySelector('input[name="INTEXT"]');
+      if (!input) return "no-input";
+      input.value = ${JSON.stringify(keyword)};
+      const btn = input.closest('form')?.querySelector('input[type="image"]');
+      if (btn) { btn.click(); return "clicked"; }
+      return "no-button";
+    })()`);
+
+    // 3. Wait for search results page
+    wait(2000);
+    waitLoad();
+    const resultUrl = getUrl();
+
+    // 4. Extract items from search results page
+    let items = [];
+    if (resultUrl.includes("fz_ssjg.jsp") || resultUrl.includes("search") || resultUrl.includes("ssjg")) {
+      const itemsRaw = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(function(a){return {text:a.innerText.trim(),href:a.href};}).filter(function(item){return item.text.length > 0;}))`);
+      items = parseEvalResult(itemsRaw);
+      if (!Array.isArray(items)) items = [];
+    }
+
+    // 5. Fallback: if search didn't work, try scraping list page
     if (items.length === 0) {
-      console.log("未找到规章制度条目");
-      return 1;
+      const itemsRaw2 = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(function(a){return {text:a.innerText.trim(),href:a.href};}).filter(function(item){return item.text.length > 0;}))`);
+      items = parseEvalResult(itemsRaw2);
+      if (!Array.isArray(items)) items = [];
     }
 
-    let matches = items;
-    if (keyword) {
-      matches = items.filter(item => item.text.includes(keyword));
-    }
+    const matches = items.filter(item => item.text.includes(keyword));
 
-    // --list-only: just list matching items
+    // --list-only mode
     if (isListOnly) {
       if (isJson) {
-        console.log(JSON.stringify({ keyword: keyword || "all", page, total: matches.length, items: matches }, null, 2));
+        console.log(JSON.stringify({ keyword, total: matches.length, items: matches }, null, 2));
       } else {
-        console.log(`规章制度${keyword ? ` - 搜索"${keyword}"` : ""}（第 ${page} 页，共 ${matches.length} 条）\n`);
-        matches.forEach((item, i) => {
-          console.log(`  ${i + 1}. ${item.text}`);
-        });
+        console.log(`${LABEL} - 搜索"${keyword}"（共 ${matches.length} 条）\n`);
+        matches.forEach((item, i) => console.log(`  ${i + 1}. ${item.text}`));
       }
       return matches.length > 0 ? 0 : 1;
     }
 
-    // keyword search + detail extraction
-    if (!keyword) {
-      console.error("error: --keyword is required (or use --list-only)");
-      return 2;
-    }
-
+    // Not found
     if (matches.length === 0) {
       if (isJson) {
         console.log(JSON.stringify({ error: "not_found", keyword, suggestions: items.map(i => i.text) }));
       } else {
-        console.log(`未找到包含"${keyword}"的规章制度`);
-        console.log(`\n当前页面的制度列表（可能相关）：`);
-        items.forEach((item, i) => console.log(`  ${i + 1}. ${item.text}`));
+        console.log(`未找到包含"${keyword}"的${LABEL}`);
+        if (items.length > 0) {
+          console.log(`\n当前${LABEL}列表（可能相关）：`);
+          items.forEach((item, i) => console.log(`  ${i + 1}. ${item.text}`));
+        }
       }
       return 1;
     }
 
-    // Navigate to first matching item detail page
+    // Navigate to first match detail
     const firstMatch = matches[0];
     if (!isJson) process.stderr.write(`找到匹配："${firstMatch.text}"\n`);
     open(firstMatch.href);
     waitLoad();
     wait(2000);
 
-    // Extract detail content
+    // Extract detail
     const detailRaw = evalJS(`JSON.stringify((function(){
       const title = document.querySelector("h1")?.innerText?.trim() || "";
       const vc = document.querySelector(".v_news_content");
-      const imgs = vc ? Array.from(vc.querySelectorAll("img")).filter(img => img.className.includes("img_vsb_content")).map(img => img.src) : [];
-      const textContent = vc ? vc.innerText?.trim() || "" : "";
-      const meta = {};
+      const imgs = vc ? Array.from(vc.querySelectorAll("img")).filter(function(img){return img.className.includes("img_vsb_content");}).map(function(img){return img.src;}) : [];
+      const textContent = vc ? (vc.innerText||"").trim() : "";
       const bodyText = document.body.innerText || "";
       const deptMatch = bodyText.match(/发布部门[：:]\\s*([^\\n]+)/);
       const dateMatch = bodyText.match(/发布时间[：:]\\s*([^\\n]+)/);
-      if (deptMatch) meta.department = deptMatch[1].trim();
-      if (dateMatch) meta.date = dateMatch[1].trim();
-      
-      // Check for PDF attachments
       const attachMatch = bodyText.match(/公告附件如下[：:]\\s*[\\s\\S]*?([^\\s]+\\.pdf)/);
-      if (attachMatch) meta.attachment = attachMatch[1].trim();
-      
-      if (imgs.length > 0 && !textContent) {
-        return JSON.stringify({ title, contentType: "images", content: textContent, imageUrls: imgs, meta });
+      var meta = {};
+      if(deptMatch) meta.department = deptMatch[1].trim();
+      if(dateMatch) meta.date = dateMatch[1].trim();
+      if(attachMatch) meta.attachment = attachMatch[1].trim();
+      if(imgs.length > 0 && !textContent) {
+        return JSON.stringify({title:title,contentType:"images",content:textContent,imageUrls:imgs,meta:meta});
       }
-      return JSON.stringify({ title, contentType: "text", content: textContent, meta });
+      return JSON.stringify({title:title,contentType:"text",content:textContent,meta:meta});
     })())`);
 
-    let detailData;
-    try {
-      let parsed = detailRaw;
-      // Handle double JSON encoding from evalJS
-      while (typeof parsed === 'string' && parsed.startsWith('"') && parsed.endsWith('"')) {
-        try { parsed = JSON.parse(parsed); } catch { break; }
-      }
-      detailData = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-    } catch (e) {
-      console.error(`解析详情数据失败: ${e.message}`);
-      return 1;
-    }
+    const detailData = parseEvalResult(detailRaw);
 
-    // Handle image download
     if (detailData.contentType === "images" && downloadDir && detailData.imageUrls?.length > 0) {
       await downloadImages(detailData.imageUrls, detailData.title || keyword, downloadDir);
-      detailData.downloadedTo = join(downloadDir, detailData.title?.replace(/[\/\\:*?"<>|]/g, "_").substring(0, 30) || keyword);
+      detailData.downloadedTo = join(downloadDir, (detailData.title || keyword).replace(/[\/\\:*?"<>|]/g, "_").substring(0, 30));
     }
 
     if (isJson) {
