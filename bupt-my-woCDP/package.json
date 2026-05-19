@@ -1,0 +1,30 @@
+{
+  "name": "bupt-my-woCDP",
+  "version": "1.0.0",
+  "description": "北邮信息门户自动化 - AgentBrowser 方案（无需 CDP）",
+  "type": "module",
+  "bin": {
+    "bupt-login": "./scripts/login.mjs",
+    "bupt-search-regulations": "./scripts/search-regulations.mjs",
+    "bupt-search-news": "./scripts/search-news.mjs",
+    "bupt-search-notices": "./scripts/search-notices.mjs",
+    "bupt-search-files": "./scripts/search-files.mjs",
+    "bupt-search-guides": "./scripts/search-guides.mjs"
+  },
+  "scripts": {
+    "postinstall": "agent-browser install",
+    "login": "node scripts/login.mjs",
+    "search-regulations": "node scripts/search-regulations.mjs",
+    "search-news": "node scripts/search-news.mjs",
+    "search-notices": "node scripts/search-notices.mjs",
+    "search-files": "node scripts/search-files.mjs",
+    "search-guides": "node scripts/search-guides.mjs"
+  },
+  "dependencies": {
+    "agent-browser": "^0.27.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

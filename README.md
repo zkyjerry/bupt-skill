@@ -9,8 +9,9 @@
 这个项目的目标是用 **浏览器自动化**，把这些平台的常用操作封装成可直接调用的脚本，让同学们可以通过 SKILL 的方式能更方便地完成日常任务：查课、看作业、下课件、提交作业……不用再一个个页面去找。
 
 后续计划陆续覆盖：
+- **教学云平台**（ucloud.bupt.edu.cn）：查课、看作业、下课件、提交作业 ✅
+- **信息门户**（my.bupt.edu.cn）：查规章制度、校内通知、校内新闻等 ✅
 - **教务管理系统**（jwxt.bupt.edu.cn）：查成绩、选课、查课表
-- **信息门户**（my.bupt.edu.cn）：一站式信息查看
 - **图书馆系统**：座位预约、书目查询
 - 以及其他常用校园平台
 
@@ -24,10 +25,15 @@ bupt-skill/
 ├── bupt-ucloud/           # 云邮教学平台 - CDP 方案
 │   ├── SKILL.md           # Cursor Skill 定义文件
 │   └── scripts/           # Node.js 脚本（依赖 CDP Proxy）
-└── bupt-ucloud-woCDP/     # 云邮教学平台 - AgentBrowser 方案（无需 CDP）
-    ├── SKILL.md           # Cursor Skill 定义文件
-    ├── package.json       # 自包含依赖
-    └── scripts/           # Node.js 脚本（自动管理浏览器）
+├── bupt-ucloud-woCDP/     # 云邮教学平台 - AgentBrowser 方案（无需 CDP）
+│   ├── SKILL.md           # Cursor Skill 定义文件
+│   ├── package.json       # 自包含依赖
+│   └── scripts/           # Node.js 脚本（自动管理浏览器）
+└── bupt-my-woCDP/         # 信息门户 - AgentBrowser 方案
+    ├── SKILL.md
+    ├── package.json
+    ├── scripts/           # 检索校内新闻/通知/文件/指南/规章制度
+    └── tests/             # TDD 集成测试
 ```
 
 ---
@@ -87,6 +93,49 @@ npm install    # 首次安装依赖（含 Chromium 浏览器）
 | `scripts/submit-assignment.mjs` | 上传附件并提交作业（提交前有终端确认步骤） |
 
 详细用法见 [`bupt-ucloud-woCDP/SKILL.md`](bupt-ucloud-woCDP/SKILL.md)。
+
+---
+
+## bupt-my-woCDP — 信息门户
+
+针对 [http://my.bupt.edu.cn](http://my.bupt.edu.cn) 的自动化检索脚本。
+
+**前置条件**：Node.js 18+
+
+```bash
+cd bupt-my-woCDP
+npm install
+```
+
+| 脚本 | 功能 |
+|------|------|
+| `scripts/login.mjs` | CAS 统一身份认证登录 |
+| `scripts/search-regulations.mjs` | 检索规章制度 |
+| `scripts/search-news.mjs` | 检索校内新闻 |
+| `scripts/search-notices.mjs` | 检索校内通知 |
+| `scripts/search-files.mjs` | 检索校内文件 |
+| `scripts/search-guides.mjs` | 检索办事指南 |
+
+详细用法见 [`bupt-my-woCDP/SKILL.md`](bupt-my-woCDP/SKILL.md)。
+
+### 快速上手
+
+```bash
+cd bupt-my-woCDP && npm install
+
+# 登录
+node scripts/login.mjs 学工号 密码
+
+# 搜索规章制度
+node scripts/search-regulations.mjs --keyword "报销"
+node scripts/search-regulations.mjs --keyword "报销" --json
+
+# 下载图片类制度的图片
+node scripts/search-regulations.mjs --keyword "学生管理规定" --download-dir ~/Downloads
+
+# 检索校内通知
+node scripts/search-notices.mjs --keyword "考试" --list-only
+```
 
 ---
 
