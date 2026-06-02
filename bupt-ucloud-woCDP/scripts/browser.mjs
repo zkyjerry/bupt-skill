@@ -90,6 +90,82 @@ export function getText() {
 }
 
 /**
+ * 解析 evalJS 返回的 JSON 字符串（含双重引号包裹的情况）
+ */
+export function parseEvalJson(raw) {
+  let parsed = raw;
+  if (typeof parsed === "string" && parsed.startsWith('"') && parsed.endsWith('"')) {
+    try { parsed = JSON.parse(parsed); } catch { /* keep as-is */ }
+  }
+  return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
+}
+
+/**
+ * 获取首页所有课程名（含 carousel 全部页）
+ */
+export function getAllCourseNames() {
+  const result = evalJS(`(function(){
+    try {
+      const names = Array.from(document.querySelectorAll(".my-lesson-item"))
+        .map(el => el.querySelector(".my-lesson-name")?.innerText?.trim() || "")
+        .filter(Boolean);
+      return JSON.stringify({ names });
+    } catch (e) { return JSON.stringify({ error: e.message }); }
+  })()`);
+  return parseEvalJson(result);
+}
+
+/**
+ * 翻页后在 active 页点击课程
+ * @param {"keyword"|"exact"} mode
+ * @param {string} value
+ */
+export function clickCourseOnCarousel(mode, value) {
+  const totalPages = parseEvalJson(evalJS(`(function(){
+    const indicator = Array.from(document.querySelectorAll(".banner-indicator"))
+      .find(el => /^\\d+\\/\\d+$/.test(el.innerText.trim()));
+    const text = indicator?.innerText.trim() || "1/1";
+    return JSON.stringify(parseInt(text.split("/")[1], 10) || 1);
+  })()`));
+
+  for (let page = 0; page < totalPages; page++) {
+    if (page > 0) {
+      evalJS(`document.querySelector(".my-lesson-section [title='下一页']")?.click(); "next"`);
+      wait(600);
+    }
+    const clickResult = evalJS(`(function(){
+      const mode = ${JSON.stringify(mode)};
+      const value = ${JSON.stringify(value)};
+      const active = document.querySelector(".my-lesson-section .el-carousel__item.is-active");
+      if (!active) return "not-here";
+      const target = Array.from(active.querySelectorAll(".my-lesson-item")).find(el => {
+        const name = el.querySelector(".my-lesson-name")?.innerText?.trim() || "";
+        return mode === "keyword" ? name.includes(value) : name === value;
+      });
+      if (!target) return "not-here";
+      target.click();
+      return "clicked";
+    })()`);
+    if (clickResult === "clicked") return true;
+  }
+  return false;
+}
+
+/**
+ * 按关键词点击课程
+ */
+export function clickCourseByKeyword(keyword) {
+  return clickCourseOnCarousel("keyword", keyword);
+}
+
+/**
+ * 按完整课程名点击
+ */
+export function clickCourseByName(name) {
+  return clickCourseOnCarousel("exact", name);
+}
+
+/**
  * 执行 JavaScript
  * @param {string} script - JS 代码
  * @returns {string}
@@ -97,7 +173,12 @@ export function getText() {
 export function evalJS(script) {
   // 转义引号
   const escaped = script.replace(/"/g, '\\"');
-  return ab(`eval "${escaped}"`, { timeout: 15000 });
+  const raw = ab(`eval "${escaped}"`, { timeout: 15000 }).trim();
+  // agent-browser 会将字符串结果 JSON 编码（如 "clicked"），需解包
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try { return JSON.parse(raw); } catch { return raw; }
+  }
+  return raw;
 }
 
 /**

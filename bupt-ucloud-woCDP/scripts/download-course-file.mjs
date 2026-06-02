@@ -19,7 +19,8 @@ import { execSync } from "child_process";
 import { existsSync, mkdirSync } from "fs";
 import { resolve, join } from "path";
 import {
-  open, getUrl, waitLoad, evalJS, wait, close, click, snapshot, loadState
+  open, getUrl, waitLoad, evalJS, wait, close, loadState,
+  getAllCourseNames, clickCourseByKeyword
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
@@ -57,8 +58,8 @@ async function downloadFile() {
     wait(3000);
 
     // 3. 读取所有课程名，找目标
-    const allNamesRaw = evalJS(`Array.from(document.querySelectorAll(".my-lesson-item")).map(el=>el.querySelector(".my-lesson-name")?.innerText?.trim()||"").filter(Boolean).join("\\n")`);
-    const allNames = allNamesRaw.split("\n").filter(Boolean);
+    const { names: allNames = [], error: namesError } = getAllCourseNames();
+    if (namesError) throw new Error(namesError);
     const targetName = allNames.find(n => n.includes(courseKeyword));
     if (!targetName) {
       console.error(`未找到包含"${courseKeyword}"的课程，可用课程：`);
@@ -66,16 +67,8 @@ async function downloadFile() {
       return 1;
     }
 
-    // 4. 点击目标课程
-    const clickResult = evalJS(`(function(){
-      const items = Array.from(document.querySelectorAll(".my-lesson-item"));
-      const target = items.find(el=>el.querySelector(".my-lesson-name")?.innerText?.trim()===${JSON.stringify(targetName)});
-      if(!target) return "not found";
-      target.click();
-      return "clicked";
-    })()`);
-
-    if (clickResult !== "clicked") {
+    // 4. 翻页后在 active 页点击
+    if (!clickCourseByKeyword(courseKeyword)) {
       console.error(`无法点击课程"${targetName}"`);
       return 1;
     }
