@@ -66,6 +66,19 @@ function parseEvalResult(raw) {
   } catch { return raw; }
 }
 
+function scrapeItems() {
+  const itemsRaw = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(function(a){return {text:a.innerText.trim(),href:a.href};}).filter(function(item){return item.text.length > 0;}))`);
+  const items = parseEvalResult(itemsRaw);
+  return Array.isArray(items) ? items : [];
+}
+
+function loadListPageItems() {
+  open(LIST_URL);
+  waitLoad();
+  wait(2000);
+  return scrapeItems();
+}
+
 async function run() {
   try {
     loadState();
@@ -115,16 +128,12 @@ async function run() {
     // 4. Extract items from search results page
     let items = [];
     if (resultUrl.includes("fz_ssjg.jsp") || resultUrl.includes("search") || resultUrl.includes("ssjg")) {
-      const itemsRaw = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(function(a){return {text:a.innerText.trim(),href:a.href};}).filter(function(item){return item.text.length > 0;}))`);
-      items = parseEvalResult(itemsRaw);
-      if (!Array.isArray(items)) items = [];
+      items = scrapeItems();
     }
 
-    // 5. Fallback: if search didn't work, try scraping list page
+    // 5. Fallback: site search empty — reload list page and filter client-side
     if (items.length === 0) {
-      const itemsRaw2 = evalJS(`JSON.stringify(Array.from(document.querySelectorAll('a[href*="wbnewsid"]')).map(function(a){return {text:a.innerText.trim(),href:a.href};}).filter(function(item){return item.text.length > 0;}))`);
-      items = parseEvalResult(itemsRaw2);
-      if (!Array.isArray(items)) items = [];
+      items = loadListPageItems();
     }
 
     const matches = items.filter(item => item.text.includes(keyword));

@@ -56,7 +56,8 @@ export function abJson(args, options = {}) {
  * @returns {string} 页面标题
  */
 export function open(url) {
-  return ab(`open "${url}"`, { timeout: 30000 });
+  const sanitized = typeof url === "string" ? url.replace(/^"|"$/g, "") : url;
+  return ab(`open "${sanitized}"`, { timeout: 30000 });
 }
 
 /**
@@ -99,7 +100,12 @@ export function getText() {
 export function evalJS(script) {
   // 转义引号
   const escaped = script.replace(/"/g, '\\"');
-  return ab(`eval "${escaped}"`, { timeout: 15000 });
+  const raw = ab(`eval "${escaped}"`, { timeout: 15000 }).trim();
+  // agent-browser 会将字符串结果 JSON 编码，需解包
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    try { return JSON.parse(raw); } catch { return raw; }
+  }
+  return raw;
 }
 
 /**
