@@ -15,27 +15,16 @@
  */
 
 import {
-  open, getUrl, waitLoad, evalJS, wait, close, loadState
+  openWithSession, getUrl, waitLoad, evalJS, wait, close
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
-const AUTH_DOMAIN = "auth.bupt.edu.cn";
 
 const isJson = process.argv.includes("--json");
 
 async function listCourses() {
   try {
-    // 0. 加载保存的会话状态
-    loadState();
-
-    // 1. 打开主页
-    open(HOME_URL);
-    waitLoad();
-
-    const pageUrl = getUrl();
-
-    // 2. 检查是否登录
-    if (pageUrl.includes(AUTH_DOMAIN)) {
+    if (!openWithSession(HOME_URL)) {
       console.error("未登录，请先运行 login.mjs 获取有效会话");
       return 1;
     }

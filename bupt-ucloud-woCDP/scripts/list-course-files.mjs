@@ -16,7 +16,7 @@
  */
 
 import {
-  open, getUrl, waitLoad, evalJS, wait, close, loadState,
+  openWithSession, getUrl, waitLoad, evalJS, wait, close,
   parseEvalJson, getAllCourseNames, clickCourseByKeyword
 } from "./browser.mjs";
 
@@ -39,15 +39,7 @@ function filenameFromUrl(url) {
 
 async function listFiles() {
   try {
-    // 0. 加载保存的会话状态
-    loadState();
-
-    // 1. 打开主页
-    open(HOME_URL);
-    waitLoad();
-
-    const pageUrl = getUrl();
-    if (pageUrl.includes("auth.bupt.edu.cn")) {
+    if (!openWithSession(HOME_URL)) {
       console.error("未登录，请先运行 login.mjs");
       return 1;
     }

@@ -278,6 +278,7 @@ const STATE_FILE = join(STATE_DIR, "session.json");
  */
 export function saveState() {
   if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+  wait(500);
   ab(`state save "${STATE_FILE}"`);
 }
 
@@ -302,6 +303,54 @@ export function loadState() {
  */
 export function hasState() {
   return existsSync(STATE_FILE);
+}
+
+/** CAS 登录域，用于判断会话是否有效 */
+export const AUTH_DOMAIN = "auth.bupt.edu.cn";
+
+/**
+ * 关闭浏览器实例（切换 skill 或冷启动前调用）
+ */
+export function resetBrowser() {
+  close();
+}
+
+/**
+ * 加载会话并打开页面，返回是否已登录
+ * @param {string} url
+ * @param {string} authDomain
+ */
+export function openWithSession(url, authDomain = AUTH_DOMAIN) {
+  resetBrowser();
+  loadState();
+  open(url);
+  waitLoad();
+  wait(800);
+
+  let current = getUrl();
+  if (current === "about:blank" || current.includes(authDomain)) {
+    resetBrowser();
+    loadState();
+    open(url);
+    waitLoad();
+    wait(800);
+    current = getUrl();
+  }
+  return !current.includes(authDomain);
+}
+
+/**
+ * 解析 evalJS 返回的 JSON 字符串
+ */
+export function parseEvalJson(raw) {
+  let parsed = raw;
+  if (typeof parsed === "string" && parsed.startsWith('"') && parsed.endsWith('"')) {
+    try { parsed = JSON.parse(parsed); } catch { /* keep as-is */ }
+  }
+  if (typeof parsed === "string") {
+    try { return JSON.parse(parsed); } catch { return parsed; }
+  }
+  return parsed;
 }
 
 /**

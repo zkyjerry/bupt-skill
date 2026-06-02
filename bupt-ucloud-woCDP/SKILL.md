@@ -53,6 +53,28 @@ node "${SKILL_DIR}/scripts/login.mjs" 2023211442 "密码" "https://jwxt.bupt.edu
 | `scripts/list-course-files.mjs` | 列出指定课程所有课件文件（含章节/子块层级） | `node list-course-files.mjs <课程名关键词> [--json]` |
 | `scripts/download-course-file.mjs` | 下载指定课件文件到本地 | `node download-course-file.mjs <课程名> <文件名关键词> [保存目录]` |
 | `scripts/submit-assignment.mjs` | 提交作业（附件上传 + 用户确认后提交） | `node submit-assignment.mjs <作业标题关键词> <文件路径> [--comment <备注>]` |
+| `scripts/reset-browser.mjs` | 关闭 agent-browser 实例 | `node reset-browser.mjs` |
+
+## 推荐执行顺序
+
+```bash
+# 1. 登录（单独执行，不要与下一步用 && 链式）
+node scripts/login.mjs <学工号> <密码>
+
+# 2. 业务脚本（会话保存在 ~/.bupt-ucloud/session.json）
+node scripts/list-courses.mjs
+```
+
+**切换至信息门户 skill 前**，先执行 `node scripts/reset-browser.mjs` 或 `./node_modules/.bin/agent-browser close`，避免 daemon 冲突。
+
+## 故障排查
+
+| 现象 | 处理 |
+|------|------|
+| `未登录，请先运行 login.mjs` | 重新执行 `login.mjs`（不要与业务脚本链式） |
+| `Failed to connect` / daemon 错误 | `node scripts/reset-browser.mjs` 后重试 |
+| 课程在非当前 carousel 页 | 脚本已自动翻页点击，无需手动操作 |
+| `--pending-only --title` 无结果 | 改用 `--title` 单独过滤，或先 `list-pending-tasks.mjs` |
 
 ## 关键技术说明
 
@@ -64,6 +86,8 @@ node "${SKILL_DIR}/scripts/login.mjs" 2023211442 "密码" "https://jwxt.bupt.edu
 | course.html 切换课程不重读 localStorage | course.html SPA 只在初次加载时读 localStorage.site；切换课程必须从 index.html 点击课程卡片触发完整导航 |
 | 获取下载URL需模拟用户点击 | 拦截 `window.open`（平台下载时通过 `window.open` 打开 CDN URL） |
 | 课件URL无需登录态 | `fileucloud.bupt.edu.cn` CDN URL 公开可访问，curl 直接下载 |
+| 会话恢复 | 业务脚本通过 `openWithSession` 加载 `~/.bupt-ucloud/session.json` |
+| 课程 carousel | 非当前页课程需翻页后在 active 页点击 |
 
 ## 课件相关脚本说明
 
@@ -89,9 +113,9 @@ node download-course-file.mjs 通信软件设计 Unit01-Course ~/Downloads
 # 第一步：快速查看待办详情（只读首页待办区域，很快）
 node list-pending-tasks.mjs
 
-# 第二步：需要知道作业属于哪门课时，遍历所有课（较慢，约60秒）
+# 第二步：需要知道作业属于哪门课时，遍历所有课（较慢，约 2–3 分钟 / 12 门课）
 node list-assignment-courses.mjs --pending-only
-node list-assignment-courses.mjs --title "Unit03"  # 按标题关键词过滤
+node list-assignment-courses.mjs --title "Lab03"  # 输出含教师名
 ```
 
 ## 提交作业说明

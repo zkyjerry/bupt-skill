@@ -49,6 +49,8 @@ async function login() {
 
     // 检查是否已登录（直接跳转）
     if (!pageUrl.includes("auth.bupt.edu.cn")) {
+      wait(500);
+      saveState();
       console.log(pageUrl);
       return 0;
     }
@@ -127,6 +129,7 @@ async function login() {
     }
 
     // 登录成功，保存会话状态
+    wait(1000);
     saveState();
     console.log(finalUrl);
     return 0;

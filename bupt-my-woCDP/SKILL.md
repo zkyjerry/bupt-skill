@@ -40,6 +40,25 @@ node "${SKILL_DIR}/scripts/login.mjs" <学工号> <密码>
 | `scripts/search-notices.mjs` | 检索校内通知 | `node search-notices.mjs --keyword <关键词> [--list-only] [--json]` |
 | `scripts/search-files.mjs` | 检索校内文件 | `node search-files.mjs --keyword <关键词> [--list-only] [--json]` |
 | `scripts/search-guides.mjs` | 检索办事指南 | `node search-guides.mjs --keyword <关键词> [--list-only] [--json]` |
+| `scripts/reset-browser.mjs` | 关闭 agent-browser 实例 | `node reset-browser.mjs` |
+
+## 推荐执行顺序
+
+```bash
+node scripts/login.mjs <学工号> <密码>   # 单独执行
+node scripts/search-regulations.mjs --keyword "采购" --json
+```
+
+从云平台 skill 切换过来时，先 `node scripts/reset-browser.mjs`。
+
+## 故障排查
+
+| 现象 | 处理 |
+|------|------|
+| login 后 search 报未登录 | 重跑 `login.mjs`（勿链式 `&&`） |
+| daemon 连接失败 | `node scripts/reset-browser.mjs` |
+| 办事指南站内搜索 0 条 | 脚本会自动回退到列表页客户端过滤 |
+| 正文为图片 | stderr 会提示，用 `--download-dir` 下载 |
 
 ## 使用示例
 
@@ -83,7 +102,9 @@ node scripts/search-news.mjs --keyword "学术" --list-only
 | 登录表单在 `<iframe id="loginIframe">` 内 | 使用 `frame "#loginIframe"` 切换 |
 | 内容以图片形式展示 | 检测 `.v_news_content` 中的 `img_vsb_content` 类图片，提取 URL 并支持下载 |
 | 内容以文本形式展示 | 直接提取 `.v_news_content` 的 `innerText` |
-| evalJS 返回双重 JSON 编码 | 循环 `JSON.parse` 直到不是字符串 |
+| evalJS 返回双重 JSON 编码 | `parseEvalJson` / 循环 `JSON.parse` |
+| 办事指南站内搜索无结果 | 自动回退列表页按关键词过滤 |
+| 详情 URL 参数丢失 | `open()` 自动去除 evalJS 多余的 JSON 引号 |
 | 翻页机制 | 列表页底部有页码输入框和"跳转"按钮 |
 
 ## 退出码

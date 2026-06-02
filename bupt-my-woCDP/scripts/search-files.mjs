@@ -20,8 +20,7 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import {
-  open, getUrl, waitLoad, evalJS, wait, close,
-  loadState
+  openWithSession, open, getUrl, waitLoad, evalJS, wait, close,
 } from "./browser.mjs";
 
 const LIST_URL = "http://my.bupt.edu.cn/list.jsp?urltype=tree.TreeTempUrl&wbtreeid=2001";
@@ -81,12 +80,7 @@ function loadListPageItems() {
 
 async function run() {
   try {
-    loadState();
-
-    // 1. Open list page
-    open(LIST_URL);
-    waitLoad();
-    if (getUrl().includes(AUTH_DOMAIN)) {
+    if (!openWithSession(LIST_URL)) {
       console.error("未登录，请先运行 login.mjs");
       return 1;
     }
@@ -191,6 +185,10 @@ async function run() {
     })())`);
 
     const detailData = parseEvalResult(detailRaw);
+
+    if (detailData.contentType === "images" && !detailData.content) {
+      process.stderr.write("提示：正文为图片，使用 --download-dir 可下载阅读\n");
+    }
 
     if (detailData.contentType === "images" && downloadDir && detailData.imageUrls?.length > 0) {
       await downloadImages(detailData.imageUrls, detailData.title || keyword, downloadDir);

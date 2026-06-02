@@ -19,7 +19,7 @@ import { createInterface } from "readline";
 import { existsSync, statSync } from "fs";
 import { resolve, basename } from "path";
 import {
-  open, getUrl, waitLoad, evalJS, wait, close, fill, click, snapshot, loadState
+  openWithSession, open, getUrl, waitLoad, evalJS, wait, close, fill, click, snapshot
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
@@ -55,15 +55,7 @@ function confirm(prompt) {
 
 async function run() {
   try {
-    // 0. 加载保存的会话状态
-    loadState();
-
-    // 1. 打开主页
-    open(HOME_URL);
-    waitLoad();
-
-    const pageUrl = getUrl();
-    if (pageUrl.includes("auth.bupt.edu.cn")) {
+    if (!openWithSession(HOME_URL)) {
       console.error("未登录，请先运行 login.mjs");
       return 1;
     }

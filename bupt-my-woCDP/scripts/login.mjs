@@ -41,6 +41,8 @@ async function login() {
     const pageUrl = getUrl();
 
     if (!pageUrl.includes("auth.bupt.edu.cn")) {
+      wait(500);
+      saveState();
       console.log(pageUrl);
       return 0;
     }
@@ -109,6 +111,7 @@ async function login() {
       return 1;
     }
 
+    wait(1000);
     saveState();
     console.log(finalUrl);
     return 0;

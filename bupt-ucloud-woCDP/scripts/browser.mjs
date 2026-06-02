@@ -54,7 +54,8 @@ export function abJson(args, options = {}) {
  * @returns {string} 页面标题
  */
 export function open(url) {
-  return ab(`open "${url}"`, { timeout: 30000 });
+  const sanitized = typeof url === "string" ? url.replace(/^"|"$/g, "") : url;
+  return ab(`open "${sanitized}"`, { timeout: 30000 });
 }
 
 /**
@@ -104,15 +105,72 @@ export function parseEvalJson(raw) {
  * 获取首页所有课程名（含 carousel 全部页）
  */
 export function getAllCourseNames() {
+  const { courses = [], error } = getAllCourses();
+  if (error) return { names: [], error };
+  return { names: courses.map(c => c.name).filter(Boolean) };
+}
+
+/**
+ * 获取首页所有课程（含教师、院系）
+ */
+export function getAllCourses() {
   const result = evalJS(`(function(){
     try {
-      const names = Array.from(document.querySelectorAll(".my-lesson-item"))
-        .map(el => el.querySelector(".my-lesson-name")?.innerText?.trim() || "")
-        .filter(Boolean);
-      return JSON.stringify({ names });
+      const courses = Array.from(document.querySelectorAll(".my-lesson-item")).map(item => ({
+        name: item.querySelector(".my-lesson-name")?.innerText?.trim() || "",
+        teacher: item.querySelector(".my-lesson-teachers")?.innerText?.trim() || "",
+        dept: item.querySelector(".my-lesson-area")?.innerText?.trim() || "",
+      })).filter(c => c.name);
+      return JSON.stringify({ courses });
     } catch (e) { return JSON.stringify({ error: e.message }); }
   })()`);
   return parseEvalJson(result);
+}
+
+/** CAS 登录域，用于判断会话是否有效 */
+export const AUTH_DOMAIN = "auth.bupt.edu.cn";
+
+/**
+ * 关闭浏览器实例（切换 skill 或冷启动前调用）
+ */
+export function resetBrowser() {
+  close();
+}
+
+/**
+ * 加载会话并打开页面，返回是否已登录
+ * @param {string} url
+ * @param {string} authDomain
+ */
+export function openWithSession(url, authDomain = AUTH_DOMAIN) {
+  resetBrowser();
+  loadState();
+  open(url);
+  waitLoad();
+  wait(800);
+
+  let current = getUrl();
+  if (current === "about:blank" || current.includes(authDomain)) {
+    resetBrowser();
+    loadState();
+    open(url);
+    waitLoad();
+    wait(800);
+    current = getUrl();
+  }
+  return !current.includes(authDomain);
+}
+
+/**
+ * 判断作业是否未结束（兼容 status / myStatus 字段差异）
+ */
+export function isPendingAssignment(assignment) {
+  const status = assignment?.status || "";
+  const myStatus = assignment?.myStatus || "";
+  if (status === "进行中" || status.includes("进行")) return true;
+  if (myStatus === "未提交" || myStatus.includes("未提交")) return true;
+  if (myStatus.includes("待提交")) return true;
+  return false;
 }
 
 /**
@@ -351,6 +409,7 @@ const STATE_FILE = join(STATE_DIR, "session.json");
  */
 export function saveState() {
   if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+  wait(500);
   ab(`state save "${STATE_FILE}"`);
 }
 

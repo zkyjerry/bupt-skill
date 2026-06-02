@@ -12,47 +12,42 @@
  */
 
 import {
-  open, getUrl, waitLoad, evalJS, wait, close, click, snapshot, loadState
+  openWithSession, open, getUrl, waitLoad, evalJS, wait, close, parseEvalJson
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
 const isJson = process.argv.includes("--json");
 
+function cardTitlesFromPage() {
+  const raw = evalJS(`JSON.stringify(Array.from(document.querySelectorAll(".in-progress-item")).map(c => {
+    const nameEl = c.querySelector(".acitivity-name,.activity-name,[class*=name]");
+    return (nameEl?.innerText?.trim() || c.innerText?.trim().split("\\n")[0] || "").trim();
+  }).filter(Boolean))`);
+  const titles = parseEvalJson(raw);
+  return Array.isArray(titles) ? titles : [];
+}
+
 async function run() {
   try {
-    // 0. 加载保存的会话状态
-    loadState();
-
-    // 1. 打开主页
-    open(HOME_URL);
-    waitLoad();
-
-    const pageUrl = getUrl();
-    if (pageUrl.includes("auth.bupt.edu.cn")) {
+    if (!openWithSession(HOME_URL)) {
       console.error("未登录，请先运行 login.mjs");
       return 1;
     }
 
-    // 2. 等待待办卡片渲染
     wait(3000);
 
-    // 3. 检查待办数量
-    const cardCount = parseInt(evalJS(`document.querySelectorAll(".in-progress-item").length`) || "0");
+    const cardCount = parseInt(evalJS(`document.querySelectorAll(".in-progress-item").length`) || "0", 10);
     if (cardCount === 0) {
       console.log("暂无待办作业");
       return 0;
     }
 
-    // 4. 读取所有卡片标题
-    const titlesRaw = evalJS(`Array.from(document.querySelectorAll(".in-progress-item")).map(c=>c.querySelector(".acitivity-name,.activity-name,[class*=name]")?.innerText?.trim()||c.innerText?.trim().split("\\n")[0]).join("\\n")`);
-    const titles = titlesRaw.split("\n").filter(Boolean);
-
-    // 5. 逐卡点击 → 提取详情
+    const cardTitles = cardTitlesFromPage();
     const assignments = [];
+
     for (let i = 0; i < cardCount; i++) {
       if (!isJson) process.stderr.write(`提取第 ${i + 1}/${cardCount} 个作业...\n`);
 
-      // 确保在主页
       const curUrl = getUrl();
       if (!curUrl.includes("homePage")) {
         open(HOME_URL);
@@ -60,14 +55,9 @@ async function run() {
         wait(2000);
       }
 
-      // 点击第 i 张卡片
       evalJS(`document.querySelectorAll(".in-progress-item")[${i}]?.click(); "clicked"`);
+      wait(3000);
 
-      // 等待导航到详情页
-      wait(2000);
-
-      // 提取详情
-      const detailUrl = getUrl();
       const details = evalJS(`(function(){
         try {
           const hash = location.href.split("#")[1]||"";
@@ -90,13 +80,14 @@ async function run() {
             const siblings = parent ? Array.from(parent.children) : [];
             const labelIdx = siblings.indexOf(label);
             const valueEl = siblings[labelIdx+1];
-            const value = valueEl?.innerText?.trim() || "";
-            labelPairs[key] = value;
+            labelPairs[key] = valueEl?.innerText?.trim() || "";
           });
+
+          const domTitle = document.querySelector("h1,[class*=title],[class*=assignment]")?.innerText?.trim() || "";
 
           return JSON.stringify({
             assignmentId: params.assignmentId||"",
-            title: params.assignmentTitle || params.assignmentId,
+            title: params.assignmentTitle || domTitle || params.assignmentId || "",
             startTime: startMatch?.[1]?.trim()||"",
             endTime: endMatch?.[1]?.trim()||"",
             content: labelPairs["作业内容"]||"",
@@ -110,17 +101,21 @@ async function run() {
       })()`);
 
       let data;
-      try { data = JSON.parse(details); } catch { data = { error: "parse failed" }; }
-      if (!data.error) assignments.push(data);
+      try { data = parseEvalJson(details); } catch { data = { error: "parse failed" }; }
+      if (data.error) continue;
+
+      if (!data.title || data.title === data.assignmentId) {
+        data.title = cardTitles[i] || data.title || data.assignmentId || "未知作业";
+      }
+      assignments.push(data);
     }
 
-    // 6. 输出
     if (isJson) {
       console.log(JSON.stringify({ total: assignments.length, assignments }, null, 2));
     } else {
       console.log(`\n共 ${assignments.length} 个待办作业\n${"─".repeat(50)}`);
-      assignments.forEach((a, i) => {
-        console.log(`\n【${i + 1}】${a.title}`);
+      assignments.forEach((a, idx) => {
+        console.log(`\n【${idx + 1}】${a.title}`);
         console.log(`  开始：${a.startTime}`);
         console.log(`  截止：${a.endTime}`);
         console.log(`  章节：${a.chapter}`);

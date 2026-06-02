@@ -17,8 +17,8 @@
  */
 
 import {
-  open, getUrl, waitLoad, evalJS, wait, close, loadState,
-  parseEvalJson, getAllCourseNames, clickCourseByName
+  openWithSession, open, getUrl, waitLoad, evalJS, wait, close,
+  parseEvalJson, getAllCourses, clickCourseByName, isPendingAssignment
 } from "./browser.mjs";
 
 const HOME_URL = "https://ucloud.bupt.edu.cn/uclass/index.html#/student/homePage";
@@ -31,15 +31,7 @@ const titleKeyword = titleIdx >= 0 ? process.argv[titleIdx + 1] : null;
 
 async function run() {
   try {
-    // 0. 加载保存的会话状态
-    loadState();
-
-    // 1. 打开主页
-    open(HOME_URL);
-    waitLoad();
-
-    const pageUrl = getUrl();
-    if (pageUrl.includes("auth.bupt.edu.cn")) {
+    if (!openWithSession(HOME_URL)) {
       console.error("未登录，请先运行 login.mjs");
       return 1;
     }
@@ -47,13 +39,16 @@ async function run() {
     // 2. 等待课程卡片渲染
     wait(3000);
 
-    // 3. 获取所有课程名
-    const { names: courseNames = [], error: namesError } = getAllCourseNames();
-    if (namesError) throw new Error(namesError);
-    if (courseNames.length === 0) {
+    // 3. 获取所有课程
+    const { courses: courseList = [], error: coursesError } = getAllCourses();
+    if (coursesError) throw new Error(coursesError);
+    if (courseList.length === 0) {
       console.error("未找到课程");
       return 1;
     }
+
+    const teacherByCourse = Object.fromEntries(courseList.map(c => [c.name, c.teacher]));
+    const courseNames = courseList.map(c => c.name);
 
     if (!isJson) process.stderr.write(`共 ${courseNames.length} 门课程，逐一遍历中...\n`);
 
@@ -119,14 +114,18 @@ async function run() {
       try { assignments = parseEvalJson(assignmentsRaw); } catch { assignments = []; }
       if (Array.isArray(assignments)) {
         assignments.forEach(a => {
-          allAssignments.push({ course: courseName, ...a });
+          allAssignments.push({
+            course: courseName,
+            teacher: teacherByCourse[courseName] || "",
+            ...a,
+          });
         });
       }
     }
 
     // 5. 过滤
     let filtered = allAssignments;
-    if (pendingOnly) filtered = filtered.filter(a => a.status === "进行中");
+    if (pendingOnly) filtered = filtered.filter(isPendingAssignment);
     if (titleKeyword) filtered = filtered.filter(a => a.title.includes(titleKeyword));
 
     // 6. 输出
@@ -140,7 +139,7 @@ async function run() {
       console.log(`\n共 ${filtered.length} 条作业\n${"─".repeat(60)}`);
       filtered.forEach((a, i) => {
         console.log(`\n【${i + 1}】${a.title}`);
-        console.log(`  所属课程：${a.course}`);
+        console.log(`  所属课程：${a.course}${a.teacher ? `（${a.teacher}）` : ""}`);
         console.log(`  章节：${a.chapter}  模式：${a.mode}  截止：${a.deadline}`);
         console.log(`  作业状态：${a.status}  我的状态：${a.myStatus}`);
       });
